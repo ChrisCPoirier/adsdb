@@ -28,6 +28,7 @@ to the ADS dbcapi library.
 import os
 import sys
 import time
+import datetime
 import exceptions
 import codecs
 import platform
@@ -380,17 +381,6 @@ class Connection(object):
         self.valueof = mk_valueof((A_BINARY, A_STRING), char_set)
         self.assign = mk_assign(char_set)
         self.char_set = char_set
-#            cur = self.cursor()
-#            try:
-#                cur.execute("select connection_property('CharSet')")
-#                char_set = cur.fetchone()[0]
-#                if codecs.lookup(char_set):
-#                    self.valueof = mk_valueof((A_BINARY,), char_set)
-#                    self.assign = mk_assign(char_set)
-#                    self.char_set = char_set
-#            finally:
-#                cur.close()
-
         self.c = self.api.ads_new_connection()
         if not self.c:
             error = self.error()
@@ -421,11 +411,10 @@ class Connection(object):
         return self.api.ads_rollback(self.con())
 
     def cancel(self):
-	try:
-	    return self.api.ads_cancel(self.con())
-	except AttributeError:
-	    raise InterfaceError("cancel not supported")
-
+        try:
+            return self.api.ads_cancel(self.con())
+        except AttributeError:
+            raise InterfaceError("cancel not supported")
 
     def error(self):
         buf = create_string_buffer(512)
@@ -539,7 +528,8 @@ class Cursor(object):
                    info.max_size,
                    info.precision,
                    info.scale,
-                   info.nullable),
+                   info.nullable,
+                   info.native_type),
                    info.native_type)
     
     def executemany(self, operation, seq_of_parameters):
@@ -551,33 +541,33 @@ class Cursor(object):
             self.api.ads_bind_param(self.stmt, k, byref(param))
             return param
 
-    	try:
-    	    self.new_statement(operation)
-    	    bind_count = self.api.ads_num_params(self.stmt)
-    	    self.rowcount = 0
-    	    for parameters in seq_of_parameters:
-    		parms = [bind(k, col)
-    			 for k, col in enumerate(parameters[:bind_count])]
-    		if not self.api.ads_execute(self.stmt):
-    		    raise self.parent.error()
-    		
-    		try:
-    		    self.description, types = zip(*self.columns())
-    		    rowcount = self.api.ads_num_rows(self.stmt)
-    		    self.converter = self.TypeConverter(types)
-    		except ValueError:
-    		    rowcount = self.api.ads_affected_rows(self.stmt)
-    		    self.description = None
-    		    self.converter = None
-    
-    		if rowcount < 0:
-    		    # Can happen if number of rows is only an estimate
-    		    self.rowcount = -1
-    		elif self.rowcount >= 0:
-    		    self.rowcount += rowcount
-    	except:
-    	    self.rowcount = -1
-    	    raise
+        try:
+            self.new_statement(operation)
+            bind_count = self.api.ads_num_params(self.stmt)
+            self.rowcount = 0
+            for parameters in seq_of_parameters:
+                parms = [bind(k, col)
+            for k, col in enumerate(parameters[:bind_count])]
+            if not self.api.ads_execute(self.stmt):
+                raise self.parent.error()
+
+            try:
+                self.description, types = zip(*self.columns())
+                rowcount = self.api.ads_num_rows(self.stmt)
+                self.converter = self.TypeConverter(types)
+            except ValueError:
+                rowcount = self.api.ads_affected_rows(self.stmt)
+                self.description = None
+                self.converter = None
+
+            if rowcount < 0:
+                # Can happen if number of rows is only an estimate
+                self.rowcount = -1
+            elif self.rowcount >= 0:
+                self.rowcount += rowcount
+        except:
+            self.rowcount = -1
+            raise
     
             return [(self.valueof)(param.value) for param in parms]
     
@@ -644,6 +634,57 @@ def TimestampFromTicks(ticks):
 
 class Binary( str ):
     pass
+
+def ads_typecast_timestamp (s):
+    "Custom timestamp converter for ADS since it uses a different string format"
+    if not s: return None
+    if not ' ' in s: return typecast_date(s)
+
+    d, t, ampm = s.split()
+    dates = d.split('/')
+    times = t.split(':')
+    seconds = times[2]
+    hour = int(times[0])
+
+    # Convert to 24 hour time
+    if hour == 12:
+        hour = 0
+    if ampm == 'PM':
+        hour += 12
+
+    if '.' in seconds: # check whether seconds have a fractional part
+        seconds, microseconds = seconds.split('.')
+    else:
+        microseconds = '0'
+
+    return datetime.datetime(int(dates[2]), int(dates[0]), int(dates[1]),
+        hour, int(times[1]), int(seconds), int((microseconds + '000000')[:6]))
+
+def ads_typecast_date(s):
+    "Custom date converter for ADS since it uses a different string format"
+    m, d, y = s.split('/')
+    return s and datetime.date(int(y), int(m), int(d)) or None # returns None if s is null
+
+def ads_typecast_time(s): # does NOT store time zone information
+    "Custom time converter for ADS since it uses a different string format"
+    if not s: return None
+
+    t, ampm = s.split()
+    hour, minutes, seconds = t.split(':')
+
+    # Convert to 24 hour time
+    iHour = int(hour)
+    if iHour == 12:
+        iHour = 0
+    if ampm == 'PM':
+        iHour += 12
+
+    if '.' in seconds: # check whether seconds have a fractional part
+        seconds, microseconds = seconds.split('.')
+    else:
+        microseconds = '0'
+
+    return datetime.time(iHour, int(minutes), int(seconds), int(float('.'+microseconds) * 1000000))
 
 CONVERSION_CALLBACKS = {}
 def register_converter(datatype, callback):
