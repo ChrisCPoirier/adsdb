@@ -111,7 +111,7 @@ class ColumnInfo(Structure):
                 ("native_type", c_int),
                 ("precision",   c_short),
                 ("scale",       c_short),
-                ("max_size",    c_size_t),
+                ("max_size",    c_int),
                 ("nullable",    c_int)]
 
 
@@ -522,6 +522,11 @@ class Cursor(object):
         info = ColumnInfo()
         for i in xrange(self.api.ads_num_cols(self.get_stmt())):
             self.api.ads_get_column_info(self.get_stmt(), i, byref(info))
+            if info.native_type in [DT_NSTRING,DT_NFIXCHAR,DT_NVARCHAR,DT_LONGNVARCHAR]:
+                # Precision and size here are in bytes, so convert it to chars
+                # for unicode fields
+                info.precision = info.precision / 2
+                info.max_size = info.max_size / 2
             yield ((info.name,
                    ToPyType[info.native_type],
                    None,
