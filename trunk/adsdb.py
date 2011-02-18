@@ -356,7 +356,7 @@ def connect(*args, **kwargs):
 
 
 class Connection(object):
-    
+
     def __init__(self, args, kwargs, parent = Root("PYTHON")):
 
         self.Error = Error
@@ -369,7 +369,6 @@ class Connection(object):
         self.IntegrityError = IntegrityError
         self.DataError = DataError
         self.NotSupportedError = NotSupportedError
-
         self.cursors = set()
 
         self.parent, self.api = parent, parent.api
@@ -426,7 +425,7 @@ class Connection(object):
 
     def clear_error(self):
         return self.api.ads_clear_error(self.con())
-    
+
     def close(self):
         c = self.con()
         self.c = None
@@ -442,7 +441,7 @@ class Connection(object):
         return x
 
     def __enter__(self): return self.cursor()
-    
+
     def __exit__(self, exc, value, tb):
         if exc:
             self.rollback()
@@ -536,9 +535,9 @@ class Cursor(object):
                    info.nullable,
                    info.native_type),
                    info.native_type)
-    
+
     def executemany(self, operation, seq_of_parameters):
-            
+
         def bind(k, col):
             param = BindParam()
             self.api.ads_describe_bind_param(self.stmt, k, byref(param))
@@ -573,12 +572,12 @@ class Cursor(object):
         except:
             self.rowcount = -1
             raise
-    
+
             return [(self.valueof)(param.value) for param in parms]
-    
+
     def execute(self, operation, parameters = ()):
         self.executemany(operation, [parameters])
-    
+
     def callproc(self, procname, parameters = ()):
         stmt = 'EXECUTE PROCEDURE '+procname+'('+','.join(len(parameters)*('?',))+')'
         return self.executemany(stmt, [parameters])
@@ -590,7 +589,7 @@ class Cursor(object):
             # if rc < 0:
             #     print "truncation of column %d"%i
             yield (self.valueof)(value)
-    
+
     def rows(self):
         if not self.description:
             raise InterfaceError("no result set")
@@ -602,19 +601,19 @@ class Cursor(object):
         if size is None:
             size = self.arraysize
         return [row for i,row in zip(xrange(size), self.rows())]
-    
+
     def fetchone(self):
         rows = self.fetchmany(size=1)
         if rows:
             return rows[0]
         return None
-    
+
     def fetchall(self):
         return list(self.rows())
 
     def setinputsizes(self, sizes):
         pass
-    
+
     def setoutputsize(self, sizes, column):
         pass
 
