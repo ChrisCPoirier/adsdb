@@ -1,4 +1,0 @@
-#labels Featured,Phase-Implementation
-= Helpful Links and Tips =
-
-[http://devzone.advantagedatabase.com/dz/webhelp/Advantage10.1/index.html?ace_adsconnect101.htm AdsConnect101] documentation online.  All the connection options listed there are supported with adsdb connections.
