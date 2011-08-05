@@ -34,6 +34,7 @@ import codecs
 import platform
 from ctypes import *
 from struct import pack, unpack, calcsize
+from decimal import *
 
 API_VERSION = 1
 API_VERSION_EX = 2
@@ -53,6 +54,10 @@ A_UVAL16        = 9
 A_VAL8          = 10
 A_UVAL8         = 11
 A_NCHAR         = 12
+A_DECIMAL       = 13
+A_DATE          = 14
+A_TIME          = 15
+A_TIMESTAMP     = 16
 
 DT_NOTYPE       = 0
 DT_DATE         = 384
@@ -151,10 +156,11 @@ NUMBER    = DBAPISet([A_DOUBLE,
                       A_VAL16,
                       A_UVAL16,
                       A_VAL8,
-                      A_UVAL8])
-DATE      = DBAPISet()
-TIME      = DBAPISet()
-TIMESTAMP = DBAPISet()
+                      A_UVAL8,
+                      A_DECIMAL])
+DATE      = DBAPISet([A_DATE])
+TIME      = DBAPISet([A_TIME])
+TIMESTAMP = DBAPISet([A_TIMESTAMP])
 DATETIME  = TIMESTAMP
 ROWID     = DBAPISet()
 
@@ -223,7 +229,7 @@ class NotSupportedError(DatabaseError):
     pass
 
 
-format = 'xxxdqQiIhHbB'
+format = 'xxxdqQiIhHbBxxxx'
 
 def mk_valueof(raw, char_set):
     def valueof(data):
@@ -235,6 +241,18 @@ def mk_valueof(raw, char_set):
             return data.buffer[:data.length.contents.value].decode(char_set)
         elif data.type in (A_NCHAR,):
             return unicode( data.buffer[:data.length.contents.value], 'utf-16' )
+        elif data.type in (A_DECIMAL,):
+            # Numeric fields come out as strings, convert them to decimal.Decimal objects
+            return Decimal( data.buffer[:data.length.contents.value])
+        elif data.type in (A_DATE,):
+            # Date fields come out as string, convert them to datetime.date objects
+            return ads_typecast_date( data.buffer[:data.length.contents.value] )
+        elif data.type in (A_TIME,):
+            # Time fields come out as string, convert them to datetime.time objects
+            return ads_typecast_time( data.buffer[:data.length.contents.value] )
+        elif data.type in (A_TIMESTAMP,):
+            # Timestamp fields come out as string, convert them to datetime.time objects
+            return ads_typecast_timestamp( data.buffer[:data.length.contents.value] )
         else:
             fmt = format[data.type]
             return unpack(fmt, data.buffer[:calcsize(fmt)])[0]
@@ -546,34 +564,36 @@ class Cursor(object):
             return param
 
         try:
+            if isinstance(operation, unicode):
+                operation = operation.encode(self.char_set)
             self.new_statement(operation)
             bind_count = self.api.ads_num_params(self.stmt)
             self.rowcount = 0
             for parameters in seq_of_parameters:
                 parms = [bind(k, col)
-            for k, col in enumerate(parameters[:bind_count])]
-            if not self.api.ads_execute(self.stmt):
-                raise self.parent.error()
+                         for k, col in enumerate(parameters[:bind_count])]
+                if not self.api.ads_execute(self.stmt):
+                    raise self.parent.error()
 
-            try:
-                self.description, types = zip(*self.columns())
-                rowcount = self.api.ads_num_rows(self.stmt)
-                self.converter = self.TypeConverter(types)
-            except ValueError:
-                rowcount = self.api.ads_affected_rows(self.stmt)
-                self.description = None
-                self.converter = None
-
-            if rowcount < 0:
-                # Can happen if number of rows is only an estimate
-                self.rowcount = -1
-            elif self.rowcount >= 0:
-                self.rowcount += rowcount
+                try:
+                    self.description, types = zip(*self.columns())
+                    rowcount = self.api.ads_num_rows(self.stmt)
+                    self.converter = self.TypeConverter(types)
+                except ValueError:
+                    rowcount = self.api.ads_affected_rows(self.stmt)
+                    self.description = None
+                    self.converter = None
+    
+                if rowcount < 0:
+                    # Can happen if number of rows is only an estimate
+                    self.rowcount = -1
+                elif self.rowcount >= 0:
+                    self.rowcount += rowcount
         except:
             self.rowcount = -1
             raise
 
-            return [(self.valueof)(param.value) for param in parms]
+        return [(self.valueof)(param.value) for param in parms]
 
     def execute(self, operation, parameters = ()):
         self.executemany(operation, [parameters])

@@ -93,8 +93,8 @@ class DatabaseAPI20Test(unittest.TestCase):
     connect_kw_args = {} # Keyword arguments for connect
     table_prefix = 'dbapi20test_' # If you need to specify a prefix for tables
 
-    ddl1 = 'create table %sbooze (name varchar(20))' % table_prefix
-    ddl2 = 'create table %sbarflys (name varchar(20))' % table_prefix
+    ddl1 = 'TRY create table %sbooze (name varchar(20)); CATCH ALL DELETE FROM %sbooze; END TRY;' % (table_prefix, table_prefix)
+    ddl2 = 'TRY create table %sbarflys (name varchar(20)); CATCH ALL DELETE FROM %sbarflys; END TRY;' % (table_prefix, table_prefix)
     xddl1 = 'drop table %sbooze' % table_prefix
     xddl2 = 'drop table %sbarflys' % table_prefix
 
@@ -279,8 +279,9 @@ class DatabaseAPI20Test(unittest.TestCase):
             self.assertEqual(len(cur.description),1,
                 'cursor.description describes too many columns'
                 )
-            self.assertEqual(len(cur.description[0]),7,
-                'cursor.description[x] tuples must have 7 elements'
+            # increased expected length to 8 since ADS also returns the native ACE field type
+            self.assertEqual(len(cur.description[0]),8,
+                'cursor.description[x] tuples must have 8 elements'
                 )
             self.assertEqual(cur.description[0][0].lower(),'name',
                 'cursor.description[x][0] must return column name'
