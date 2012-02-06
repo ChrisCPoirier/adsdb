@@ -240,7 +240,10 @@ def mk_valueof(raw, char_set):
         elif data.type in (A_STRING,):
             return data.buffer[:data.length.contents.value].decode(char_set)
         elif data.type in (A_NCHAR,):
-            return unicode( data.buffer[:data.length.contents.value], 'utf-16' )
+            if isinstance(data, unicode):
+                return data.buffer[:data.length.contents.value]
+            else:
+                return unicode( data.buffer[:data.length.contents.value], char_set )
         elif data.type in (A_DECIMAL,):
             # Numeric fields come out as strings, convert them to decimal.Decimal objects
             return Decimal( data.buffer[:data.length.contents.value])
@@ -564,8 +567,6 @@ class Cursor(object):
             return param
 
         try:
-            if isinstance(operation, unicode):
-                operation = operation.encode(self.char_set)
             self.new_statement(operation)
             bind_count = self.api.ads_num_params(self.stmt)
             self.rowcount = 0
