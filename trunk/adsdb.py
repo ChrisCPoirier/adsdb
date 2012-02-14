@@ -663,6 +663,8 @@ class Binary( str ):
 def ads_typecast_timestamp (s):
     "Custom timestamp converter for ADS since it uses a different string format"
     if not s: return None
+    if isinstance( s, datetime.datetime ):
+        return s
     if not ' ' in s: return typecast_date(s)
 
     d, t, ampm = s.split()
@@ -687,12 +689,17 @@ def ads_typecast_timestamp (s):
 
 def ads_typecast_date(s):
     "Custom date converter for ADS since it uses a different string format"
+    if not s: return None
+    if isinstance( s, datetime.date ):
+        return s
+
     m, d, y = s.split('/')
     return s and datetime.date(int(y), int(m), int(d)) or None # returns None if s is null
 
 def ads_typecast_time(s): # does NOT store time zone information
     "Custom time converter for ADS since it uses a different string format"
     if not s: return None
+    if isinstance(s, datetime.time): return s
 
     t, ampm = s.split()
     hour, minutes, seconds = t.split(':')
