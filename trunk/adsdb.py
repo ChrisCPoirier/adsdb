@@ -240,10 +240,7 @@ def mk_valueof(raw, char_set):
         elif data.type in (A_STRING,):
             return data.buffer[:data.length.contents.value].decode(char_set)
         elif data.type in (A_NCHAR,):
-            if isinstance(data, unicode):
-                return data.buffer[:data.length.contents.value]
-            else:
-                return unicode( data.buffer[:data.length.contents.value], char_set )
+            return unicode( data.buffer[:data.length.contents.value], char_set )
         elif data.type in (A_DECIMAL,):
             # Numeric fields come out as strings, convert them to decimal.Decimal objects
             return Decimal( data.buffer[:data.length.contents.value])
